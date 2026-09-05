@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reflex | Delivery control</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">R</span><span>REFLEX</span><small>READINESS SPRINT</small></div>
+      <div class="team"><span class="live-dot"></span> LIVE CONTROL <span class="divider"></span> NAIROBI / KE</div>
+    </header>
+
+    <section class="hero">
+      <div><p class="eyebrow">DELIVERY OPERATIONS / {{ deliveries|length }} REQUESTS</p><h1>Every parcel has a pulse.</h1><p class="intro">A single source of truth for Kenyan retailers, dispatchers, and riders.</p></div>
+      <div class="hero-note"><span class="note-number">01</span><span>ASSIGN<br>TRACK<br>PROVE</span></div>
+    </section>
+
+    <section class="metrics" aria-label="Delivery summary">
+      <div class="metric"><span>IN THE QUEUE</span><strong>{{ counts['Assigned'] }}</strong><em>assigned</em></div>
+      <div class="metric accent"><span>IN MOTION</span><strong>{{ counts['Picked Up'] }}</strong><em>picked up</em></div>
+      <div class="metric"><span>COMPLETED</span><strong>{{ counts['Delivered'] }}</strong><em>proof captured</em></div>
+    </section>
+
+    <section class="workspace">
+      {% if confirmed_id %}<div class="confirmation-banner"><span class="confirm-icon">✓</span><div><strong>ORDER CONFIRMED</strong><span>RF-{{ '%04d'|format(confirmed_id) }} scanned successfully · Picked Up</span></div><span class="confirmation-time">JUST NOW</span></div>{% endif %}
+      <div class="section-heading"><div><p class="eyebrow">DISPATCH BOARD</p><h2>Today’s handoffs</h2></div><span id="sync-status">Synced just now</span></div>
+      <div class="board">
+        {% for delivery in deliveries %}
+        <article class="delivery-card" data-delivery-id="{{ delivery.id }}">
+          <div class="card-top"><span class="order-id">RF-{{ '%04d'|format(delivery.id) }}</span><span class="status status-{{ delivery.status|lower|replace(' ', '-') }}">{{ delivery.status }}</span></div>
+          <h3>{{ delivery.customer_name }}</h3><p class="address">{{ delivery.address }} · {{ delivery.phone }}</p>
+          <div class="item"><span class="item-icon">▣</span><span>{{ delivery.item_description }}</span></div>
+          <div class="card-bottom"><span class="rider-label">RIDER <strong>{{ delivery.rider or 'Unassigned' }}</strong></span><div class="actions">
+            {% if delivery.status == 'Assigned' %}<form method="post" action="{{ url_for('update_status', delivery_id=delivery.id) }}"><input type="hidden" name="status" value="Picked Up"><button title="Mark picked up">PICK UP ↗</button></form>{% elif delivery.status == 'Picked Up' %}<form method="post" action="{{ url_for('update_status', delivery_id=delivery.id) }}"><input type="hidden" name="status" value="Delivered"><button class="dark" title="Mark delivered">DELIVER ↗</button></form>{% else %}<span class="proof">✓ POD VERIFIED</span>{% endif %}
+          </div></div>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="lower-grid">
+      <div class="panel intake"><div class="section-heading"><div><p class="eyebrow">RETAILER INTAKE</p><h2>Log a request</h2></div><span class="role-tag">RETAILER STAFF</span></div>
+        <form method="post" action="{{ url_for('create_delivery') }}" class="request-form"><label>Customer name<input name="customer_name" required placeholder="e.g. Brian Otieno"></label><label>Phone number<input name="phone" required placeholder="+254 ..."></label><label class="wide">Delivery address<input name="address" required placeholder="Estate, street, landmark"></label><label class="wide">Item description<input name="item_description" required placeholder="What is going out?">
+        </label><label>Assign rider<select name="rider">{% for rider in riders %}<option>{{ rider }}</option>{% endfor %}</select></label><button class="submit">CREATE REQUEST <span>↗</span></button></form>
+      </div>
+      <div class="panel scanner"><div class="section-heading"><div><p class="eyebrow">RIDER TOOL</p><h2>Scan to confirm</h2></div><span class="role-tag orange">RIDER</span></div><div class="scan-box"><div class="scan-frame"><span></span><span></span><span></span><span></span><div class="scan-line"></div></div><p>Point camera at order QR</p><small>Demo mode: choose an order below</small></div><form method="post" action="{{ url_for('scan_delivery', delivery_id=deliveries[0].id if deliveries else 1) }}"><button class="scan-button">SCAN ORDER CONFIRMATION ↗</button></form>{% if deliveries and deliveries[0].confirmation_at %}<div class="scanner-confirmed">✓ CONFIRMED {{ deliveries[0].confirmation_at|replace('T', ' ') }}</div>{% endif %}</div>
+    </section>
+
+    <footer><span>REFLEX / THE READINESS SPRINT</span><span>DELIVERY CONTROL / NAIROBI KE</span><span id="clock"></span></footer>
+  </main>
+<script>
+  const status = document.getElementById('sync-status');
+  const clock = document.getElementById('clock');
+  function tick() { clock.textContent = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); }
+  tick(); setInterval(tick, 1000);
+  setInterval(async () => { try { await fetch('/api/deliveries'); status.textContent = 'Synced ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}); } catch (error) { status.textContent = 'Offline - retrying'; } }, 10000);
+</script>
+</body>
+</html>
